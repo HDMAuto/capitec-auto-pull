@@ -1,0 +1,19 @@
+# Secrets — real branch credentials, never commit
+capitec_pull/config.yaml
+
+# Pulled card-transaction data
+capitec_pull/pulls/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Playwright
+playwright-report/
+.playwright/
+
+# OS
+.DS_Store
