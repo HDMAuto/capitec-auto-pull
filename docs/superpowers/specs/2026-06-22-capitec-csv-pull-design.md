@@ -81,8 +81,13 @@ CSV — it saves the raw export untouched.
 capitec_pull/
   config.example.yaml   committed template
   config.yaml           real branch credentials — GITIGNORED, never committed
-  pull.py               entry point: loop over branches, orchestrate, write sidecars
-  capitec_client.py     Playwright automation: login, navigate, set Yesterday, export
+  dates.py              yesterday-in-SAST + DD/MM/YYYY formatting (pure)
+  workdays.py           working-day check (skip Sundays + ZA public holidays) (pure)
+  config_loader.py      load + validate config.yaml (pure)
+  naming.py             filenames + CSV row count (pure)
+  sidecar.py            build + write sidecar JSON
+  capitec_client.py     Playwright automation: login, custom-date range, export CSV
+  pull.py               entry point: parse --date, skip non-working days, loop branches
   pulls/                output folder — GITIGNORED
 requirements.txt
 .gitignore
@@ -136,10 +141,35 @@ For each branch, into `pulls/`:
 The push session watches this folder, reads the sidecar, and POSTs accordingly
 (`status: "no_card_sales"` → the no-card-sales endpoint).
 
-## 8. "Yesterday" Definition
+## 8. Target Date & Working-Day Logic
 
-`reportDate` = the calendar day before today in **SAST (Africa/Johannesburg)**, formatted
-`YYYY-MM-DD`. Used for both the filename and the portal `reportDate`.
+The script pulls **one target date** per run:
+
+- **Default target = yesterday** in **SAST** (UTC+2, fixed), formatted `YYYY-MM-DD`. Used for
+  the filename and the portal `reportDate`.
+- **`--date YYYY-MM-DD` override** pulls a specific earlier day (catch-up after a gap).
+- **Working days are Mon–Sat.** If the target date is a **Sunday or a South African public
+  holiday**, the run **skips entirely** (no browser, no report) and exits 0 — the business
+  was closed, so there is nothing to pull.
+- A normal working day (Mon–Sat) with genuinely zero card sales is **not** skipped — it is
+  recorded as `status: "no_card_sales"` (open but no card transactions).
+
+Public holidays come from the **`holidays` Python library** (South Africa), which handles
+the Sunday-rollover rule. No manually maintained list.
+
+**Known limitation (accepted for v1):** the "pull yesterday, skip closed days" model assumes
+the script runs every day. It does **not** auto-backfill a long gap (e.g. machine off for a
+week); use `--date` per missed day, or add a backfill feature later if needed (YAGNI).
+
+### Capitec date-range UI (observed on the live site)
+
+The Transactions page has a date-range button (top-right) that opens a menu: Today,
+Yesterday, Last 7 days, Last 30 days, Custom date. **Custom date** reveals two typeable
+text fields — **Start date** and **End date** (format `DD/MM/YYYY`) — and a **Save** button
+("date range up to 6 months"). The script uses Custom date for **every** pull (uniform, and
+provably matches the computed date), setting **Start = End = target** in `DD/MM/YYYY`, then
+Save, then **Export → CSV**. (The "Yesterday" shortcut is deliberately not used — explicit
+date beats relying on Capitec's notion of "yesterday".)
 
 ## 9. Error Handling
 

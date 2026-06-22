@@ -55,8 +55,11 @@ everything together.
 ```
 playwright==1.44.0
 PyYAML==6.0.1
+holidays==0.49
 pytest==8.2.0
 ```
+
+(`holidays` provides South African public-holiday dates for the working-day check in Task 1b.)
 
 - [ ] **Step 2: Create a virtual environment and install**
 
@@ -116,6 +119,11 @@ def test_utc_input_is_converted_to_sast_first():
     # 23:30 UTC on the 21st == 01:30 SAST on the 22nd → yesterday = 21st
     now = datetime(2026, 6, 21, 23, 30, 0, tzinfo=timezone.utc)
     assert yesterday_sast(now) == "2026-06-21"
+
+
+def test_to_ddmmyyyy_converts_iso_to_capitec_format():
+    from capitec_pull.dates import to_ddmmyyyy
+    assert to_ddmmyyyy("2026-06-21") == "21/06/2026"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -144,6 +152,11 @@ def yesterday_sast(now: datetime | None = None) -> str:
         now = datetime.now(SAST)
     now_sast = now.astimezone(SAST)
     return (now_sast - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def to_ddmmyyyy(iso_date: str) -> str:
+    """Convert 'YYYY-MM-DD' to Capitec's 'DD/MM/YYYY' field format."""
+    return datetime.strptime(iso_date, "%Y-%m-%d").strftime("%d/%m/%Y")
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -155,7 +168,78 @@ Expected: PASS (3 passed).
 
 ```bash
 git add capitec_pull/dates.py tests/test_dates.py
-git commit -m "Add yesterday-in-SAST date helper"
+git commit -m "Add date helpers (yesterday-in-SAST, DD/MM/YYYY)"
+```
+
+---
+
+## Task 1b: Working-day check (skip Sundays + ZA public holidays)
+
+**Files:**
+- Create: `capitec_pull/workdays.py`
+- Test: `tests/test_workdays.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_workdays.py
+from capitec_pull.workdays import is_working_day
+
+def test_saturday_is_a_working_day():
+    # 2026-06-20 is a Saturday
+    assert is_working_day("2026-06-20") is True
+
+def test_sunday_is_not_a_working_day():
+    # 2026-06-21 is a Sunday
+    assert is_working_day("2026-06-21") is False
+
+def test_weekday_is_a_working_day():
+    # 2026-06-22 is a Monday
+    assert is_working_day("2026-06-22") is True
+
+def test_public_holiday_is_not_a_working_day():
+    # 2026-06-16 is Youth Day (SA public holiday), a Tuesday
+    assert is_working_day("2026-06-16") is False
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `pytest tests/test_workdays.py -v`
+Expected: FAIL — cannot import `is_working_day`.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# capitec_pull/workdays.py
+"""Working-day check. Closed on Sundays and South African public holidays."""
+from __future__ import annotations
+from datetime import datetime
+import holidays
+
+_ZA = holidays.SouthAfrica()
+
+
+def is_working_day(iso_date: str) -> bool:
+    """True if the business trades on this date (Mon–Sat, not a ZA public holiday)."""
+    d = datetime.strptime(iso_date, "%Y-%m-%d").date()
+    if d.weekday() == 6:          # Sunday
+        return False
+    if d in _ZA:                  # South African public holiday
+        return False
+    return True
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `pytest tests/test_workdays.py -v`
+Expected: PASS (4 passed). If the holiday test fails, confirm the installed `holidays`
+version knows 2026 SA holidays (`python -c "import holidays; print('2026-06-16' in [str(d) for d in holidays.SouthAfrica(years=2026)])"`).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add capitec_pull/workdays.py tests/test_workdays.py
+git commit -m "Add working-day check (skip Sundays + ZA public holidays)"
 ```
 
 ---
@@ -589,37 +673,51 @@ git commit -m "Add Capitec client with verified login flow"
 
 ---
 
-## Task 6: Capitec browser client — navigate, set Yesterday, export CSV
+## Task 6: Capitec browser client — custom-date range + export CSV
 
 Continue in `capitec_pull/capitec_client.py`, verifying each selector live as in Task 5.
+Uses the **Custom date** flow (Start = End = target date in `DD/MM/YYYY`), then Export → CSV.
 
 **Files:**
 - Modify: `capitec_pull/capitec_client.py`
 
-- [ ] **Step 1: Add navigation + export selectors and the export function**
+- [ ] **Step 1: Add navigation + custom-date + export selectors and the export function**
 
-Add below the login selectors:
+Add below the login selectors (these are starting guesses based on the observed page —
+verify each live, preferring `get_by_role`/`get_by_label`/`get_by_text`):
 
 ```python
-# --- transactions / export selectors to verify against the live site ---
-SEL_TRANSACTIONS_NAV = "text=Transactions"        # TODO verify
-SEL_DATE_RANGE = "text=Today"                      # TODO verify (the range control)
-SEL_RANGE_YESTERDAY = "text=Yesterday"             # TODO verify (option in the dropdown)
-SEL_EXPORT_BTN = "text=Export"                     # TODO verify
-SEL_EXPORT_CSV = "text=CSV"                         # TODO verify (CSV choice in export menu)
-# ------------------------------------------------------------------------
+# --- transactions / custom-date / export selectors to verify live ---
+SEL_TRANSACTIONS_NAV = "text=Transactions"        # left-nav item   TODO verify
+SEL_RANGE_BUTTON     = "text=Today"               # range button (label = current range) TODO verify
+SEL_CUSTOM_DATE      = "text=Custom date"         # menu option     TODO verify
+SEL_START_DATE       = "input[name='startDate']"  # Start date field TODO verify
+SEL_END_DATE         = "input[name='endDate']"    # End date field   TODO verify
+SEL_SAVE_RANGE       = "text=Save"                # Save button      TODO verify
+SEL_EXPORT_BTN       = "text=Export"              # Export button    TODO verify
+SEL_EXPORT_CSV       = "text=CSV"                 # CSV choice in export menu TODO verify
+# ---------------------------------------------------------------------
 ```
 
-Add the function:
+Add the function (note: it takes the target date and types it; the range button's label is
+the *current* range, so we don't hard-code "Today"):
 
 ```python
-def export_yesterday_csv(page: Page, download_dir: Path) -> Path:
-    """Assumes already logged in. Navigate to Transactions, set range to
-    Yesterday, export CSV, and save the download into download_dir.
-    Returns the saved file path. Raises if the export never starts."""
+def export_csv_for_date(page: Page, download_dir: Path, ddmmyyyy: str) -> Path:
+    """Assumes already logged in. Set the date range to a single day (start=end)
+    via Custom date, export CSV, and save the download into download_dir.
+
+    `ddmmyyyy` is the target date already formatted as 'DD/MM/YYYY'.
+    Returns the saved file path. Raises if the export never starts.
+    """
     page.click(SEL_TRANSACTIONS_NAV)
-    page.click(SEL_DATE_RANGE)
-    page.click(SEL_RANGE_YESTERDAY)
+    page.click(SEL_RANGE_BUTTON)
+    page.click(SEL_CUSTOM_DATE)
+
+    # Single day: start and end are the same date.
+    page.fill(SEL_START_DATE, ddmmyyyy)
+    page.fill(SEL_END_DATE, ddmmyyyy)
+    page.click(SEL_SAVE_RANGE)
 
     # Capture the browser download triggered by the export action.
     with page.expect_download() as dl_info:
@@ -632,38 +730,42 @@ def export_yesterday_csv(page: Page, download_dir: Path) -> Path:
     return dest
 ```
 
-- [ ] **Step 2: Manual verification — extend the scratch script to export**
+- [ ] **Step 2: Manual verification — extend the scratch script to export a known date**
 
-Update `scratch_login.py` (still uncommitted) to also export:
+Update `scratch_login.py` (still uncommitted) to export a recent working day you know has
+data (replace the date below):
 
 ```python
 from pathlib import Path
 from capitec_pull.config_loader import load_branches
-from capitec_pull.capitec_client import browser_page, login, export_yesterday_csv
+from capitec_pull.capitec_client import browser_page, login, export_csv_for_date
 
 b = load_branches("capitec_pull/config.yaml")[0]
 out = Path("scratch_out"); out.mkdir(exist_ok=True)
 with browser_page(headless=False) as page:
     login(page, b.username, b.password)
-    saved = export_yesterday_csv(page, out)
+    saved = export_csv_for_date(page, out, "20/06/2026")  # a day you know had sales
     print("Saved:", saved)
     input("Press Enter to close...")
 ```
 
 Run: `python scratch_login.py`
-Expected: it navigates to Transactions, switches to Yesterday, exports, and prints a saved
-CSV path under `scratch_out/`. Open the CSV and confirm it has the 18-column header.
+Expected: it opens Transactions, opens Custom date, fills both date fields with `20/06/2026`,
+clicks Save, exports, and prints a saved CSV path under `scratch_out/`. Open the CSV and
+confirm the 18-column header and that the rows are from the date you chose.
 
 - [ ] **Step 3: Fix each selector live**
 
-If any click fails, Inspect the real element and update the matching `SEL_*` constant.
-Re-run until a CSV downloads successfully. Then delete `scratch_out/`.
+If a click/fill fails, Inspect the real element and update the matching `SEL_*` constant.
+Watch especially the two date fields — if `page.fill()` doesn't stick (some masked inputs
+reject it), try `page.locator(SEL_START_DATE).click()` then `page.keyboard.type("20/06/2026")`.
+Re-run until a CSV for the chosen date downloads. Then delete `scratch_out/`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add capitec_pull/capitec_client.py
-git commit -m "Add navigate + Yesterday + export-CSV flow to Capitec client"
+git commit -m "Add custom-date range + export-CSV flow to Capitec client"
 ```
 
 ---
@@ -681,17 +783,23 @@ if any branch failed. The browser parts are imported from the verified client.
 
 ```python
 # capitec_pull/pull.py
-"""Entry point: pull yesterday's Capitec CSV for every configured branch."""
+"""Entry point: pull a target day's Capitec CSV for every configured branch.
+
+Default target = yesterday (SAST). Override with --date YYYY-MM-DD.
+Sundays and ZA public holidays are skipped (business closed).
+"""
 from __future__ import annotations
+import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from .config_loader import load_branches, ConfigError
-from .dates import yesterday_sast, SAST
+from .dates import yesterday_sast, to_ddmmyyyy, SAST
+from .workdays import is_working_day
 from .naming import csv_path, sidecar_path, count_csv_rows
 from .sidecar import build_sidecar, write_sidecar
-from .capitec_client import browser_page, login, export_yesterday_csv
+from .capitec_client import browser_page, login, export_csv_for_date
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
 PULLS_DIR = Path(__file__).parent / "pulls"
@@ -699,12 +807,12 @@ HEADLESS = False  # flip to True once the flow is proven
 
 
 def pull_branch(branch, report_date: str, pulls_dir: Path) -> dict:
-    """Pull one branch. Returns the sidecar dict (never raises)."""
+    """Pull one branch for report_date. Returns the sidecar dict (never raises)."""
     pulled_at = datetime.now(SAST).isoformat()
     try:
         with browser_page(headless=HEADLESS) as page:
             login(page, branch.username, branch.password)
-            tmp = export_yesterday_csv(page, pulls_dir)
+            tmp = export_csv_for_date(page, pulls_dir, to_ddmmyyyy(report_date))
 
         final = csv_path(pulls_dir, report_date, branch.branch_code)
         tmp.replace(final)
@@ -724,13 +832,22 @@ def pull_branch(branch, report_date: str, pulls_dir: Path) -> dict:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Pull Capitec CSVs into pulls/.")
+    parser.add_argument("--date", help="Target date YYYY-MM-DD (default: yesterday SAST)")
+    args = parser.parse_args()
+
+    report_date = args.date or yesterday_sast()
+
+    if not is_working_day(report_date):
+        print(f"{report_date} is a Sunday or public holiday — nothing to pull.")
+        return 0
+
     try:
         branches = load_branches(CONFIG_PATH)
     except ConfigError as e:
         print(f"Config error: {e}", file=sys.stderr)
         return 2
 
-    report_date = yesterday_sast()
     PULLS_DIR.mkdir(exist_ok=True)
     print(f"Pulling Capitec CSVs for {report_date} ({len(branches)} branches)")
 
@@ -753,12 +870,13 @@ if __name__ == "__main__":
 
 - [ ] **Step 2: Run the full pull headed against all branches**
 
-Pre-req: `config.yaml` has all 3 branches' real credentials.
+Pre-req: `config.yaml` has all 3 branches' real credentials. Use `--date` to target a day
+you know had sales (a plain run targets yesterday and is skipped if yesterday was closed).
 
 Run:
 ```bash
 source .venv/bin/activate
-python -m capitec_pull.pull
+python -m capitec_pull.pull --date 2026-06-20
 ```
 Expected: for each branch it prints `pulled (N rows)` / `no_card_sales` / `failed (...)`, and
 `pulls/` contains a `<date>_<branch>.csv` and `<date>_<branch>.json` per successful branch.
@@ -809,8 +927,12 @@ cp capitec_pull/config.example.yaml capitec_pull/config.yaml
 
 ```bash
 source .venv/bin/activate
-python -m capitec_pull.pull
+python -m capitec_pull.pull            # target = yesterday (SAST)
+python -m capitec_pull.pull --date 2026-06-20   # catch up a specific day
 ```
+
+Sundays and South African public holidays are skipped automatically (business closed).
+A working day (Mon–Sat) with no card sales is recorded with status `no_card_sales`.
 
 Outputs per branch into `capitec_pull/pulls/`:
 - `<YYYY-MM-DD>_<branchCode>.csv` — raw Capitec export
