@@ -1,0 +1,12 @@
+# Copy this file to config.yaml and fill in real credentials.
+# config.yaml is gitignored — never commit real credentials.
+branches: 
+  - branch_code: "101"
+    username: "nastassja@hdmparts.co.za"
+    password: "HDMb@1234"
+  - branch_code: "202"
+    username: "noxolo@hdmparts.co.za"
+    password: "HDMp@1234"
+  - branch_code: "303"
+    username: "belinda@hdmparts.co.za"
+    password: "HDMv@1234"
