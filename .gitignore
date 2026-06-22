@@ -17,3 +17,7 @@ playwright-report/
 
 # OS
 .DS_Store
+
+# Throwaway exploration scripts and their output
+scratch_*.py
+scratch_out/
