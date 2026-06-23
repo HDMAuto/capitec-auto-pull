@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hdm.capitec-pull</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/clivefigueira/CapitecCardPull/.venv/bin/python</string>
+        <string>-m</string>
+        <string>capitec_pull.pull</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/clivefigueira/CapitecCardPull</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CAPITEC_HEADLESS</key>
+        <string>1</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>5</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/clivefigueira/CapitecCardPull/logs/pull.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/clivefigueira/CapitecCardPull/logs/pull.err.log</string>
+</dict>
+</plist>
