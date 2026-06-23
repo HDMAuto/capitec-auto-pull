@@ -795,7 +795,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config_loader import load_branches, ConfigError
-from .dates import yesterday_sast, to_ddmmyyyy, SAST
+from .dates import yesterday_sast, SAST
 from .workdays import is_working_day
 from .naming import csv_path, sidecar_path, count_csv_rows
 from .sidecar import build_sidecar, write_sidecar
@@ -812,7 +812,7 @@ def pull_branch(branch, report_date: str, pulls_dir: Path) -> dict:
     try:
         with browser_page(headless=HEADLESS) as page:
             login(page, branch.username, branch.password)
-            tmp = export_csv_for_date(page, pulls_dir, to_ddmmyyyy(report_date))
+            tmp = export_csv_for_date(page, pulls_dir, report_date)
 
         final = csv_path(pulls_dir, report_date, branch.branch_code)
         tmp.replace(final)
