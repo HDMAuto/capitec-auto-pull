@@ -5,6 +5,7 @@ Sundays and ZA public holidays are skipped (business closed).
 """
 from __future__ import annotations
 import argparse
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +19,7 @@ from .capitec_client import browser_page, login, export_csv_for_date
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
 PULLS_DIR = Path(__file__).parent / "pulls"
-HEADLESS = False  # flip to True once the flow is proven
+HEADLESS = os.environ.get("CAPITEC_HEADLESS", "").lower() in ("1", "true", "yes")
 
 
 def pull_branch(branch, report_date: str, pulls_dir: Path) -> dict:

@@ -21,3 +21,6 @@ playwright-report/
 # Throwaway exploration scripts and their output
 scratch_*.py
 scratch_out/
+
+# launchd job logs
+logs/
